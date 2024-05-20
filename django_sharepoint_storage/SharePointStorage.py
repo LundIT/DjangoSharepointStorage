@@ -53,3 +53,13 @@ class SharePointStorage(Storage):
     def url(self, name):
         # Use the dirname of name as your upload_to equivalent
         return f"{self.sharepoint_url}/Shared Documents/{os.getenv('DEPLOYMENT_ENVIRONMENT', 'LOCAL')}-{os.getenv('K8S_NAMESPACE', 'ENV')}/{os.getenv('KEYCLOAK_INTERNAL_CLIENT_ID', 'Local')}/{os.getenv('INSTANCE_RESOURCE_IDENTIFIER', f'{platform.node()}/{DB_NAME}')}/{self.location}/{name}"
+
+    def print_file(self, f):
+        print(f.serverRelativeUrl)
+
+    def listdir(self):
+
+        target_folder_url = "Shared Documents/LOCAL-ENV/Local/msunbul-MacBook-Pro.fritz.box/db_MagaurSharePointAIAnswerGeneration"
+        root_folder = ctx.web.get_folder_by_server_relative_path(target_folder_url).execute_query()
+        files = root_folder.get_files(True).execute_query()
+        return [f.name for f in files]
