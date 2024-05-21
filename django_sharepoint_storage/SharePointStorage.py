@@ -19,10 +19,9 @@ class SharePointStorage(Storage):
         super().__init__(*args, **kwargs)
         self.location = location
 
-    @classmethod
     @staticmethod
     def print_failure(retry_number, ex):
-        Logger.logger_msg(f"{retry_number}: {ex}")
+        print(f"{retry_number}: {ex}")
 
     def _open(self, name, mode='rb'):
         from django_sharepoint_storage.SharePointCloudStorageUtils import get_server_relative_path
