@@ -50,8 +50,14 @@ class SharePointStorage(Storage):
         return name
 
     def delete(self, name):
-        file = File.from_url(self.url(name)).with_credentials(client_credentials).execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
-        file.delete_object().execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
+        from django_sharepoint_storage.SharePointCloudStorageUtils import get_server_relative_path
+
+        file_path = get_server_relative_path(self.url(name))
+        file = ctx.web.get_file_by_server_relative_path(file_path).get().execute_query_retry(max_retry=5,
+                                                                                             timeout_secs=5,
+                                                                                             failure_callback=SharePointStorage.print_failure)
+        file.delete_object().execute_query_retry(max_retry=5, timeout_secs=5,
+                                                 failure_callback=SharePointStorage.print_failure)
 
     def exists(self, name, retries=5):
         from django_sharepoint_storage.SharePointCloudStorageUtils import get_server_relative_path
