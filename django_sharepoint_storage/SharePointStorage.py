@@ -8,7 +8,7 @@ from io import BytesIO
 from django.conf import settings
 from django.db import connection
 
-from django_sharepoint_storage.SharePointClients import ctx, client_credentials
+from django_sharepoint_storage.SharePointContext import SharePointContext
 from django_sharepoint_storage.SharePointFile import SharePointFile
 
 DB_NAME = connection.settings_dict['NAME']
@@ -27,10 +27,12 @@ class SharePointStorage(Storage):
 
     def _open(self, name, mode='rb'):
         from django_sharepoint_storage.SharePointCloudStorageUtils import get_server_relative_path
+        
         if mode in ['r', 'rb']:
             file_url = self.url(name)
-            file = ctx.web.get_file_by_server_relative_path(get_server_relative_path(file_url)).execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
-            binary_file = file.open_binary(ctx, get_server_relative_path(file_url))
+            shrp_ctx = SharePointContext()
+            file = shrp_ctx.ctx.web.get_file_by_server_relative_path(get_server_relative_path(file_url)).execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
+            binary_file = file.open_binary(shrp_ctx.ctx, get_server_relative_path(file_url))
             bytesio_object = BytesIO(binary_file.content)
             return bytesio_object
         elif mode in ['w', 'wb']:
@@ -39,9 +41,9 @@ class SharePointStorage(Storage):
             raise ValueError(f"Unsupported file mode: {mode}")
 
     def _save(self, name, content):
-        # Here, name will have the format 'upload_to/filename.ext'
+        shrp_ctx = SharePointContext()
         folder_path = f"Shared Documents/{os.getenv('DEPLOYMENT_ENVIRONMENT', 'LOCAL')}-{os.getenv('K8S_NAMESPACE', 'ENV')}/{os.getenv('KEYCLOAK_INTERNAL_CLIENT_ID', 'Local')}/{os.getenv('INSTANCE_RESOURCE_IDENTIFIER', f'{platform.node()}/{DB_NAME}')}/{self.location}/{os.path.dirname(name)}"
-        target_folder = ctx.web.ensure_folder_path(folder_path).get().select(["ServerRelativePath"]).execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
+        target_folder = shrp_ctx.ctx.web.ensure_folder_path(folder_path).get().select(["ServerRelativePath"]).execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
         content.seek(0)
         file_content = content.read()
 
@@ -52,25 +54,26 @@ class SharePointStorage(Storage):
     def delete(self, name):
         from django_sharepoint_storage.SharePointCloudStorageUtils import get_server_relative_path
 
+        shrp_ctx = SharePointContext()
+        
         file_path = get_server_relative_path(self.url(name))
-        file = ctx.web.get_file_by_server_relative_path(file_path).get().execute_query_retry(max_retry=5,
-                                                                                             timeout_secs=5,
-                                                                                             failure_callback=SharePointStorage.print_failure)
-        file.delete_object().execute_query_retry(max_retry=5, timeout_secs=5,
-                                                 failure_callback=SharePointStorage.print_failure)
+        file = shrp_ctx.ctx.web.get_file_by_server_relative_path(file_path).get().execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
+        file.delete_object().execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
 
     def exists(self, name, retries=5):
         from django_sharepoint_storage.SharePointCloudStorageUtils import get_server_relative_path
 
         file_path = get_server_relative_path(self.url(name))
 
+        shrp_ctx = SharePointContext()
+
         if retries <= 0:
             raise Exception("SharePoint Server cannot handle requests at the moment.")
         try:
             if name.endswith('/'):
-                file = ctx.web.get_folder_by_server_relative_path(file_path[:-1]).get().execute_query()
+                file = shrp_ctx.ctx.web.get_folder_by_server_relative_path(file_path[:-1]).get().execute_query()
             else:
-                file = ctx.web.get_file_by_server_relative_path(file_path).get().execute_query()
+                file = shrp_ctx.ctx.web.get_file_by_server_relative_path(file_path).get().execute_query()
         except Exception as ex:
             if ex.response.status_code == 404:
                 return False
@@ -84,12 +87,28 @@ class SharePointStorage(Storage):
 
         file_path = get_server_relative_path(self.url(name))
 
+        shrp_ctx = SharePointContext()
+
         if name.endswith('/'):
-            file = ctx.web.get_folder_by_server_relative_path(file_path[:-1]).get().expand(["TimeLastModified"]).get().execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
+            file = shrp_ctx.ctx.web.get_folder_by_server_relative_path(file_path[:-1]).get().expand(["TimeLastModified"]).get().execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
         else:
-            file = ctx.web.get_file_by_server_relative_path(file_path).get().expand(["TimeLastModified"]).get().execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
+            file = shrp_ctx.ctx.web.get_file_by_server_relative_path(file_path).get().expand(["TimeLastModified"]).get().execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
 
         return datetime.datetime.timestamp(file.time_last_modified)
+
+    def listdir(self, name):
+        from django_sharepoint_storage.SharePointCloudStorageUtils import get_server_relative_path
+
+        shrp_ctx = SharePointContext()
+        
+        folder_path = get_server_relative_path(self.url(name))
+        if name.endswith('/'):
+            target_folder_url = folder_path[:-1]
+
+        root_folder = shrp_ctx.ctx.web.get_folder_by_server_relative_path(target_folder_url).execute_query()
+        folders = root_folder.get_folders(True).execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
+        files = root_folder.get_files(True).execute_query_retry(max_retry=5, timeout_secs=5, failure_callback=SharePointStorage.print_failure)
+        return [f.name for f in files], [f.name for f in folders]
 
     def url(self, name):
         # Use the dirname of name as your upload_to equivalent
