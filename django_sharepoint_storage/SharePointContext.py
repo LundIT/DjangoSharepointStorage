@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta
 from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
 from django.conf import settings
@@ -8,10 +9,13 @@ class SharePointContext:
     _instance = None
     _client_credentials = None
     _ctx = None
+    _last_created = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(SharePointContext, cls).__new__(cls)
+            cls._initialize(cls._instance)
+        elif datetime.now() - cls._last_created > timedelta(hours=23):
             cls._initialize(cls._instance)
         return cls._instance
 
@@ -23,6 +27,7 @@ class SharePointContext:
 
         instance._client_credentials = ClientCredential(client_id, client_secret)
         instance._ctx = ClientContext(sharepoint_url).with_credentials(instance._client_credentials)
+        cls._last_created = datetime.now()
 
     @property
     def client_credentials(self):
