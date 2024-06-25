@@ -26,8 +26,10 @@ class SharePointStorage(Storage):
     @staticmethod
     def print_failure(retry_number, ex):
         print(f"{retry_number}: {ex}")
+        if retry_number == 5:
+            raise ex
 
-    def _open(self, name, mode='rb'):
+    def _open(self, name, mode='rb', retries=5):
         from django_sharepoint_storage.SharePointCloudStorageUtils import get_server_relative_path
 
         if mode in ['r', 'rb']:
@@ -36,10 +38,18 @@ class SharePointStorage(Storage):
             file = shrp_ctx.ctx.web.get_file_by_server_relative_path(
                 get_server_relative_path(file_url)).execute_query_retry(max_retry=5, timeout_secs=5,
                                                                         failure_callback=SharePointStorage.print_failure)
-            binary_file = file.open_binary(shrp_ctx.ctx, get_server_relative_path(file_url)).execute_query_retry(max_retry=5, timeout_secs=5,
-                                                                        failure_callback=SharePointStorage.print_failure)
-            bytesio_object = BytesIO(binary_file.content)
-            return bytesio_object
+            if retries <= 0:
+                raise Exception("SharePoint Server cannot handle requests at the moment.")
+            try:
+                binary_file = file.open_binary(shrp_ctx.ctx, get_server_relative_path(file_url))
+                bytesio_object = BytesIO(binary_file.content)
+                return bytesio_object
+            except Exception as ex:
+                if ex.response.status_code == 404:
+                    raise ex
+                time.sleep(5)
+                return self._open(name, retries - 1)
+
         elif mode in ['w', 'wb', "w+", "wb+"]:
             return SharePointFile(name, mode, self)
         else:
