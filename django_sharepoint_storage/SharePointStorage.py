@@ -36,7 +36,8 @@ class SharePointStorage(Storage):
             file = shrp_ctx.ctx.web.get_file_by_server_relative_path(
                 get_server_relative_path(file_url)).execute_query_retry(max_retry=5, timeout_secs=5,
                                                                         failure_callback=SharePointStorage.print_failure)
-            binary_file = file.open_binary(shrp_ctx.ctx, get_server_relative_path(file_url))
+            binary_file = file.open_binary(shrp_ctx.ctx, get_server_relative_path(file_url)).execute_query_retry(max_retry=5, timeout_secs=5,
+                                                                        failure_callback=SharePointStorage.print_failure)
             bytesio_object = BytesIO(binary_file.content)
             return bytesio_object
         elif mode in ['w', 'wb', "w+", "wb+"]:
