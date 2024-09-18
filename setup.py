@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as readme_file:
 
 setup(
     name="DjangoSharepointStorage",
-    version="1.0.9",
+    version="1.1.0",
     author="Melih Sünbül",
     author_email="m.sunbul@lund-it.com",
     description="A Python library to use SharePoint as storage backend for your Django application",
