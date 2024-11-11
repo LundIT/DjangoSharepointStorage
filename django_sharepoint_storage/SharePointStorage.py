@@ -27,7 +27,7 @@ class SharePointStorage(Storage):
         shrp_ctx = SharePointContext()
         print(f"{retry_number}: {ex}")
         if retry_number == 5:
-            shrp_ctx.ctx.clear()
+            shrp_ctx.ctx._queries.pop()
             raise ex
 
     def _open(self, name, mode='rb', retries=5):
@@ -40,7 +40,6 @@ class SharePointStorage(Storage):
                 get_server_relative_path(file_url)).execute_query_retry(max_retry=5, timeout_secs=5,
                                                                         failure_callback=SharePointStorage.print_failure)
             if retries <= 0:
-                shrp_ctx.ctx.clear()
                 raise Exception("SharePoint Server cannot handle requests at the moment.")
             try:
                 binary_file = file.open_binary(shrp_ctx.ctx, get_server_relative_path(file_url))
@@ -48,7 +47,6 @@ class SharePointStorage(Storage):
                 return bytesio_object
             except Exception as ex:
                 if ex.response.status_code == 404:
-                    shrp_ctx.ctx.clear()
                     raise ex
                 time.sleep(5)
                 return self._open(name, mode, retries - 1)
@@ -92,7 +90,6 @@ class SharePointStorage(Storage):
         shrp_ctx = SharePointContext()
 
         if retries <= 0:
-            shrp_ctx.ctx.clear()
             raise Exception("SharePoint Server cannot handle requests at the moment.")
         try:
             if name.endswith('/'):
@@ -101,7 +98,6 @@ class SharePointStorage(Storage):
                 shrp_ctx.ctx.web.get_file_by_server_relative_path(file_path).get().execute_query()
         except Exception as ex:
             if ex.response.status_code == 404:
-                shrp_ctx.ctx.clear()
                 return False
             time.sleep(5)
             return self.exists(name, retries - 1)
