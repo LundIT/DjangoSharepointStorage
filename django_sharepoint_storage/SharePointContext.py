@@ -21,11 +21,17 @@ class SharePointContext:
     @classmethod
     def _initialize(cls, instance):
         client_id = getattr(settings, 'SHAREPOINT_APP_CLIENT_ID', 'client_id')
-        client_secret = getattr(settings, 'SHAREPOINT_APP_CLIENT_SECRET', 'client_secret')
         sharepoint_url = getattr(settings, 'SHAREPOINT_URL', 'sharepoint_url')
+        sharepoint_api_certificate_path = getattr(settings, 'SHAREPOINT_API_CERTIFICATE_PATH', 'sharepoint_api_certificate_path')
+        sharepoint_api_certificate_thumbprint = getattr(settings, 'SHAREPOINT_API_CERTIFICATE_THUMBPRINT', 'sharepoint_api_certificate_thumbprint')
+        sharepoint_api_tenant_name = getattr(settings, 'SHAREPOINT_API_TENANT_NAME', 'sharepoint_api_tenant_name')
 
-        instance._client_credentials = ClientCredential(client_id, client_secret)
-        instance._ctx = ClientContext(sharepoint_url).with_credentials(instance._client_credentials)
+        cert_settings = {
+            'client_id': client_id,
+            'thumbprint': sharepoint_api_certificate_thumbprint,
+            'cert_path': sharepoint_api_certificate_path
+        }
+        instance._ctx = ClientContext(sharepoint_url).with_client_certificate(sharepoint_api_tenant_name, **cert_settings)
         cls._last_created = datetime.now()
 
     @property

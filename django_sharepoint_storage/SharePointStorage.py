@@ -15,8 +15,6 @@ DB_NAME = connection.settings_dict['NAME']
 
 class SharePointStorage(Storage):
     sharepoint_url = getattr(settings, 'SHAREPOINT_URL', 'sharepoint_url')
-    client_id = getattr(settings, 'SHAREPOINT_APP_CLIENT_ID', 'client_id')
-    client_secret = getattr(settings, 'SHAREPOINT_APP_CLIENT_SECRET', 'client_secret')
 
     def __init__(self, location='uploads', *args, **kwargs):
         super().__init__(*args, **kwargs)
