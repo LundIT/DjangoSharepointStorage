@@ -58,12 +58,12 @@ class SharePointStorage(Storage):
         shrp_ctx = SharePointContext()
         folder_path = f"Shared Documents/{os.getenv('DEPLOYMENT_ENVIRONMENT', 'LOCAL')}-{os.getenv('K8S_NAMESPACE', 'ENV')}/{os.getenv('KEYCLOAK_INTERNAL_CLIENT_ID', 'Local')}/{os.getenv('INSTANCE_RESOURCE_IDENTIFIER', f'{platform.node()}/{DB_NAME}')}/{self.location}/{os.path.dirname(name)}"
         target_folder = shrp_ctx.ctx.web.ensure_folder_path(folder_path).get().select(
-            ["ServerRelativePath"]).execute_query_retry(max_retry=5, timeout_secs=5,
+            ["ServerRelativePath"]).execute_query_retry(max_retry=15, timeout_secs=5,
                                                         failure_callback=SharePointStorage.print_failure)
         content.seek(0)
         file_content = content.read()
 
-        target_folder.upload_file(os.path.basename(name), file_content).execute_query_retry(max_retry=5, timeout_secs=5,
+        target_folder.upload_file(os.path.basename(name), file_content).execute_query_retry(max_retry=15, timeout_secs=5,
                                                                                             failure_callback=SharePointStorage.print_failure)
 
         return name
